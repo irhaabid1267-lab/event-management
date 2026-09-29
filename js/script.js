@@ -1,50 +1,33 @@
-/* =====================================================
+
+/* =========================
    EVENT MANAGEMENT SYSTEM
    CRUD + LOCAL STORAGE
-===================================================== */
-
-
-/* =====================================================
-   LOCAL STORAGE KEY
-===================================================== */
+========================= */
 
 const STORAGE_KEY = "eventManagementSystem";
 
-
-/* =====================================================
-   GET HTML ELEMENTS
-===================================================== */
-
+/* Elements */
 const eventForm = document.getElementById("eventForm");
-
 const eventTitle = document.getElementById("eventTitle");
+const eventType = document.getElementById("eventType");
 const createdDate = document.getElementById("createdDate");
 const eventDate = document.getElementById("eventDate");
 const eventDescription = document.getElementById("eventDescription");
-const eventType = document.getElementById("eventType");
 
 const eventsContainer = document.getElementById("eventsContainer");
 const emptyState = document.getElementById("emptyState");
-
 const eventCount = document.getElementById("eventCount");
 
 const submitButton = document.getElementById("submitButton");
 const cancelButton = document.getElementById("cancelButton");
-
 const formHeading = document.getElementById("formHeading");
-
 const searchInput = document.getElementById("searchInput");
-
 const characterCount = document.getElementById("characterCount");
 
-
-/* =====================================================
-   EVENT DETAILS MODAL
-===================================================== */
-
-const eventModalElement = document.getElementById("eventModal");
-
-const eventModal = new bootstrap.Modal(eventModalElement);
+/* Details Modal */
+const eventModal = new bootstrap.Modal(
+    document.getElementById("eventModal")
+);
 
 const modalTitle = document.getElementById("modalTitle");
 const modalType = document.getElementById("modalType");
@@ -55,572 +38,261 @@ const modalDescription = document.getElementById("modalDescription");
 const modalEditButton = document.getElementById("modalEditButton");
 const modalDeleteButton = document.getElementById("modalDeleteButton");
 
-
-/* =====================================================
-   DELETE CONFIRMATION MODAL
-===================================================== */
-
-const deleteModalElement = document.getElementById("deleteModal");
-
-const deleteModal = new bootstrap.Modal(deleteModalElement);
+/* Delete Modal */
+const deleteModal = new bootstrap.Modal(
+    document.getElementById("deleteModal")
+);
 
 const confirmDeleteButton =
     document.getElementById("confirmDeleteButton");
 
-
-/* =====================================================
-   APPLICATION STATE
-===================================================== */
-
-let events = loadEvents();
+/* State */
+let events = JSON.parse(
+    localStorage.getItem(STORAGE_KEY) || "[]"
+);
 
 let editingEventId = null;
-
 let selectedEventId = null;
 
 
-/* =====================================================
+/* =========================
    PAGE LOAD
-===================================================== */
+========================= */
 
 document.addEventListener("DOMContentLoaded", () => {
-
-    setDefaultCreatedDate();
-
+    setDefaultDate();
     renderEvents(events);
-
-    updateEventCount();
-
+    updateCount();
 });
 
 
-/* =====================================================
-   LOAD EVENTS FROM LOCAL STORAGE
-===================================================== */
-
-function loadEvents() {
-
-    const storedEvents = localStorage.getItem(STORAGE_KEY);
-
-    if (!storedEvents) {
-        return [];
-    }
-
-    try {
-
-        return JSON.parse(storedEvents);
-
-    } catch (error) {
-
-        console.error(
-            "Unable to load events:",
-            error
-        );
-
-        return [];
-
-    }
-
-}
-
-
-/* =====================================================
-   SAVE EVENTS TO LOCAL STORAGE
-===================================================== */
+/* =========================
+   LOCAL STORAGE
+========================= */
 
 function saveEvents() {
-
     localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify(events)
     );
-
 }
 
 
-/* =====================================================
-   SET DEFAULT CREATED DATE
-===================================================== */
+/* =========================
+   DEFAULT DATE
+========================= */
 
-function setDefaultCreatedDate() {
-
-    const today = new Date();
-
-    const year = today.getFullYear();
-
-    const month = String(
-        today.getMonth() + 1
-    ).padStart(2, "0");
-
-    const day = String(
-        today.getDate()
-    ).padStart(2, "0");
-
-    createdDate.value =
-        `${year}-${month}-${day}`;
-
+function setDefaultDate() {
+    createdDate.value = new Date()
+        .toISOString()
+        .split("T")[0];
 }
 
 
-/* =====================================================
-   CREATE / UPDATE EVENT
-===================================================== */
+/* =========================
+   CREATE / UPDATE
+========================= */
 
-eventForm.addEventListener("submit", function (event) {
+eventForm.addEventListener("submit", e => {
 
-    event.preventDefault();
+    e.preventDefault();
 
+    if (!validateForm()) return;
 
-    /* Validate form */
+    const data = {
+        title: eventTitle.value.trim(),
+        type: eventType.value,
+        createdDate: createdDate.value,
+        eventDate: eventDate.value,
+        description: eventDescription.value.trim()
+    };
 
-    if (!validateForm()) {
-        return;
-    }
-
-
-    /* =================================================
-       CREATE NEW EVENT
-    ================================================= */
-
+    /* Create */
     if (editingEventId === null) {
 
-        const newEvent = {
-
+        events.unshift({
             id: Date.now(),
+            ...data
+        });
 
-            title: eventTitle.value.trim(),
-
-            createdDate: createdDate.value,
-
-            eventDate: eventDate.value,
-
-            description:
-                eventDescription.value.trim(),
-
-            type: eventType.value
-
-        };
-
-
-        /* Add new event at beginning */
-
-        events.unshift(newEvent);
-
-
-        /* Save to Local Storage */
-
-        saveEvents();
-
-
-        /* Refresh events */
-
-        renderEvents(getFilteredEvents());
-
-        updateEventCount();
-
-
-        /* Success message */
-
-        showMessage(
-            "Event created successfully."
-        );
-
-
-        /* Reset form */
-
-        resetForm();
+        showMessage("Event created successfully.");
 
     }
 
-
-    /* =================================================
-       UPDATE EXISTING EVENT
-    ================================================= */
-
+    /* Update */
     else {
 
-        const eventIndex = events.findIndex(
-            item => item.id === editingEventId
+        const index = events.findIndex(
+            event => event.id === editingEventId
         );
 
-
-        if (eventIndex !== -1) {
-
-            events[eventIndex] = {
-
-                ...events[eventIndex],
-
-                title:
-                    eventTitle.value.trim(),
-
-                createdDate:
-                    createdDate.value,
-
-                eventDate:
-                    eventDate.value,
-
-                description:
-                    eventDescription.value.trim(),
-
-                type:
-                    eventType.value
-
+        if (index !== -1) {
+            events[index] = {
+                ...events[index],
+                ...data
             };
 
-
-            /* Save updated data */
-
-            saveEvents();
-
-
-            /* Refresh events */
-
-            renderEvents(getFilteredEvents());
-
-            updateEventCount();
-
-
-            /* Success message */
-
-            showMessage(
-                "Event updated successfully."
-            );
-
-
-            /* Reset form */
-
-            resetForm();
-
+            showMessage("Event updated successfully.");
         }
-
     }
 
+    saveEvents();
+    renderEvents(getFilteredEvents());
+    updateCount();
+    resetForm();
 });
 
 
-/* =====================================================
-   FORM VALIDATION
-===================================================== */
+/* =========================
+   VALIDATION
+========================= */
 
 function validateForm() {
 
-    let isValid = true;
+    let valid = true;
 
+    const fields = [
+        eventTitle,
+        eventType,
+        createdDate,
+        eventDate,
+        eventDescription
+    ];
 
-    /* =================================================
-       EVENT TITLE
-    ================================================= */
+    fields.forEach(field => {
 
-    if (eventTitle.value.trim() === "") {
-
-        eventTitle.classList.add("is-invalid");
-
-        isValid = false;
-
-    } else {
-
-        eventTitle.classList.remove("is-invalid");
-
-    }
-
-
-    /* =================================================
-       EVENT TYPE
-    ================================================= */
-
-    if (eventType.value === "") {
-
-        eventType.classList.add("is-invalid");
-
-        isValid = false;
-
-    } else {
-
-        eventType.classList.remove("is-invalid");
-
-    }
-
-
-    /* =================================================
-       CREATED DATE
-    ================================================= */
-
-    if (createdDate.value === "") {
-
-        createdDate.classList.add("is-invalid");
-
-        isValid = false;
-
-    } else {
-
-        createdDate.classList.remove("is-invalid");
-
-    }
-
-
-    /* =================================================
-       EVENT DATE
-    ================================================= */
+        if (!field.value.trim()) {
+            field.classList.add("is-invalid");
+            valid = false;
+        } else {
+            field.classList.remove("is-invalid");
+        }
+    });
 
     if (
-        eventDate.value === "" ||
-        (
-            createdDate.value &&
-            eventDate.value < createdDate.value
-        )
+        createdDate.value &&
+        eventDate.value &&
+        eventDate.value < createdDate.value
     ) {
-
         eventDate.classList.add("is-invalid");
-
-        isValid = false;
-
-    } else {
-
-        eventDate.classList.remove("is-invalid");
-
+        valid = false;
     }
 
-
-    /* =================================================
-       DESCRIPTION
-    ================================================= */
-
-    if (
-        eventDescription.value.trim() === ""
-    ) {
-
-        eventDescription.classList.add(
-            "is-invalid"
-        );
-
-        isValid = false;
-
-    } else {
-
-        eventDescription.classList.remove(
-            "is-invalid"
-        );
-
-    }
-
-
-    return isValid;
-
+    return valid;
 }
 
 
-/* =====================================================
-   REMOVE VALIDATION ERROR WHILE TYPING
-===================================================== */
+/* Remove validation while typing */
 
 [
     eventTitle,
+    eventType,
     createdDate,
     eventDate,
     eventDescription
-].forEach(input => {
+].forEach(field => {
 
-    input.addEventListener("input", () => {
-
-        input.classList.remove(
-            "is-invalid"
-        );
-
+    field.addEventListener("input", () => {
+        field.classList.remove("is-invalid");
     });
 
+    field.addEventListener("change", () => {
+        field.classList.remove("is-invalid");
+    });
 });
 
 
-/* =====================================================
-   REMOVE TYPE VALIDATION ERROR
-===================================================== */
+/* =========================
+   CHARACTER COUNT
+========================= */
 
-eventType.addEventListener("change", () => {
+eventDescription.addEventListener("input", () => {
 
-    eventType.classList.remove(
-        "is-invalid"
-    );
+    characterCount.textContent =
+        eventDescription.value.length;
 
 });
 
 
-/* =====================================================
-   CHARACTER COUNTER
-===================================================== */
-
-eventDescription.addEventListener(
-    "input",
-    () => {
-
-        characterCount.textContent =
-            eventDescription.value.length;
-
-    }
-);
-
-
-/* =====================================================
+/* =========================
    RENDER EVENTS
-===================================================== */
+========================= */
 
-function renderEvents(eventList) {
+function renderEvents(list) {
 
     eventsContainer.innerHTML = "";
 
-
-    /* =================================================
-       NO EVENTS
-    ================================================= */
-
-    if (eventList.length === 0) {
-
-        emptyState.classList.remove(
-            "d-none"
-        );
-
-        return;
-
-    }
-
-
-    /* Hide empty state */
-
-    emptyState.classList.add(
-        "d-none"
+    emptyState.classList.toggle(
+        "d-none",
+        list.length !== 0
     );
 
-
-    /* =================================================
-       CREATE CARDS
-    ================================================= */
-
-    eventList.forEach(event => {
-
-        const card =
-            createEventCard(event);
-
-        eventsContainer.appendChild(card);
-
+    list.forEach(event => {
+        eventsContainer.appendChild(
+            createEventCard(event)
+        );
     });
-
 }
 
 
-/* =====================================================
-   CREATE EVENT CARD
-===================================================== */
+/* =========================
+   EVENT CARD
+========================= */
 
 function createEventCard(event) {
 
-    const wrapper =
-        document.createElement("div");
-
-
-    /* Bootstrap responsive columns */
+    const wrapper = document.createElement("div");
 
     wrapper.className =
         "col-12 col-md-6 col-lg-4 event-card-wrapper";
 
-
-    /* =================================================
-       ONLY TITLE IS SHOWN IN CARD
-    ================================================= */
-
     wrapper.innerHTML = `
-
-        <article class="event-card">
-
-            <div class="event-card-top">
-
-                <h3>
-                    ${escapeHTML(event.title)}
-                </h3>
-
-            </div>
-
-        </article>
-
+    < article class="event-card" >
+        <h3>${escapeHTML(event.title)}</h3>
+        </article >
     `;
 
-
-    /* =================================================
-       CARD CLICK → OPEN DETAILS POPUP
-    ================================================= */
-
-    wrapper.addEventListener(
-        "click",
-        () => {
-
-            openEventDetails(event.id);
-
-        }
-    );
-
+    wrapper.addEventListener("click", () => {
+        openDetails(event.id);
+    });
 
     return wrapper;
-
 }
 
 
-/* =====================================================
-   VIEW EVENT DETAILS
-===================================================== */
+/* =========================
+   DETAILS MODAL
+========================= */
 
-function openEventDetails(id) {
+function openDetails(id) {
 
     const event = events.find(
         item => item.id === id
     );
 
-
-    /* Event not found */
-
-    if (!event) {
-        return;
-    }
-
-
-    /* Store selected event */
+    if (!event) return;
 
     selectedEventId = id;
 
-
-    /* =================================================
-       FILL POPUP DATA
-    ================================================= */
-
-    modalTitle.textContent =
-        event.title;
-
-    modalType.textContent =
-        event.type;
+    modalTitle.textContent = event.title;
+    modalType.textContent = event.type;
 
     modalCreatedDate.textContent =
-        formatDate(
-            event.createdDate
-        );
+        formatDate(event.createdDate);
 
     modalEventDate.textContent =
-        formatDate(
-            event.eventDate
-        );
+        formatDate(event.eventDate);
 
     modalDescription.textContent =
         event.description;
 
-
-    /* =================================================
-       SHOW POPUP
-    ================================================= */
-
     eventModal.show();
-
 }
 
 
-/* =====================================================
-   EDIT EVENT
-===================================================== */
+/* =========================
+   EDIT
+========================= */
 
 function startEdit(id) {
 
@@ -628,362 +300,153 @@ function startEdit(id) {
         item => item.id === id
     );
 
-
-    /* Event not found */
-
-    if (!event) {
-        return;
-    }
-
-
-    /* Store editing ID */
+    if (!event) return;
 
     editingEventId = id;
 
+    eventTitle.value = event.title;
+    eventType.value = event.type;
+    createdDate.value = event.createdDate;
+    eventDate.value = event.eventDate;
+    eventDescription.value = event.description;
 
-    /* =================================================
-       LOAD EVENT DATA INTO FORM
-    ================================================= */
-
-    eventTitle.value =
-        event.title;
-
-    createdDate.value =
-        event.createdDate;
-
-    eventDate.value =
-        event.eventDate;
-
-    eventDescription.value =
-        event.description;
-
-    eventType.value =
-        event.type;
-
-
-    /* =================================================
-       CHANGE FORM UI
-    ================================================= */
-
-    formHeading.textContent =
-        "Update Event";
-
+    formHeading.textContent = "Update Event";
 
     submitButton.innerHTML =
         '<i class="bi bi-check-lg"></i> Update Event';
 
-
-    cancelButton.classList.remove(
-        "d-none"
-    );
-
-
-    /* Character counter */
+    cancelButton.classList.remove("d-none");
 
     characterCount.textContent =
         eventDescription.value.length;
 
-
-    /* =================================================
-       CLOSE DETAILS MODAL
-    ================================================= */
-
     eventModal.hide();
-
-
-    /* =================================================
-       SCROLL TO FORM
-    ================================================= */
 
     document
         .querySelector(".form-section")
         .scrollIntoView({
-            behavior: "smooth",
-            block: "start"
+            behavior: "smooth"
         });
-
 }
 
 
-/* =====================================================
-   CANCEL UPDATE
-===================================================== */
+/* =========================
+   MODAL EDIT
+========================= */
 
-cancelButton.addEventListener(
-    "click",
-    () => {
+modalEditButton.addEventListener("click", () => {
 
-        resetForm();
-
+    if (selectedEventId !== null) {
+        startEdit(selectedEventId);
     }
-);
+
+});
 
 
-/* =====================================================
-   RESET FORM
-===================================================== */
+/* =========================
+   MODAL DELETE
+========================= */
+
+modalDeleteButton.addEventListener("click", () => {
+
+    if (selectedEventId === null) return;
+
+    eventModal.hide();
+    deleteModal.show();
+
+});
+
+
+/* =========================
+   DELETE
+========================= */
+
+confirmDeleteButton.addEventListener("click", () => {
+
+    if (selectedEventId === null) return;
+
+    events = events.filter(
+        event => event.id !== selectedEventId
+    );
+
+    saveEvents();
+    renderEvents(getFilteredEvents());
+    updateCount();
+
+    selectedEventId = null;
+
+    deleteModal.hide();
+
+    showMessage("Event deleted successfully.");
+});
+
+
+/* =========================
+   CANCEL UPDATE
+========================= */
+
+cancelButton.addEventListener("click", resetForm);
+
 
 function resetForm() {
 
     eventForm.reset();
 
-
-    /* Reset editing state */
-
     editingEventId = null;
-
-
-    /* Reset heading */
 
     formHeading.textContent =
         "Create New Event";
 
-
-    /* Reset button */
-
     submitButton.innerHTML =
         '<i class="bi bi-plus-lg"></i> Create Event';
 
+    cancelButton.classList.add("d-none");
 
-    /* Hide cancel button */
-
-    cancelButton.classList.add(
-        "d-none"
-    );
-
-
-    /* Reset character count */
-
-    characterCount.textContent =
-        "0";
-
-
-    /* Remove validation errors */
+    characterCount.textContent = "0";
 
     document
         .querySelectorAll(".is-invalid")
-        .forEach(element => {
-
-            element.classList.remove(
-                "is-invalid"
-            );
-
+        .forEach(field => {
+            field.classList.remove("is-invalid");
         });
 
-
-    /* Set today's date */
-
-    setDefaultCreatedDate();
-
+    setDefaultDate();
 }
 
 
-/* =====================================================
-   OPEN DELETE CONFIRMATION
-===================================================== */
+/* =========================
+   SEARCH
+========================= */
 
-function openDeleteConfirmation(id) {
+searchInput.addEventListener("input", () => {
 
-    /* Store selected event */
+    renderEvents(
+        getFilteredEvents()
+    );
 
-    selectedEventId = id;
+});
 
-
-    /* Open delete confirmation */
-
-    deleteModal.show();
-
-}
-
-
-/* =====================================================
-   CONFIRM DELETE
-===================================================== */
-
-confirmDeleteButton.addEventListener(
-    "click",
-    () => {
-
-        /* No event selected */
-
-        if (selectedEventId === null) {
-            return;
-        }
-
-
-        /* =================================================
-           DELETE FROM ARRAY
-        ================================================= */
-
-        events = events.filter(
-            event =>
-                event.id !== selectedEventId
-        );
-
-
-        /* =================================================
-           SAVE UPDATED ARRAY
-        ================================================= */
-
-        saveEvents();
-
-
-        /* =================================================
-           REFRESH UI
-        ================================================= */
-
-        renderEvents(
-            getFilteredEvents()
-        );
-
-        updateEventCount();
-
-
-        /* Reset selected event */
-
-        selectedEventId = null;
-
-
-        /* Close delete popup */
-
-        deleteModal.hide();
-
-
-        /* Close details popup */
-
-        eventModal.hide();
-
-
-        /* Success message */
-
-        showMessage(
-            "Event deleted successfully."
-        );
-
-    }
-);
-
-
-/* =====================================================
-   MODAL EDIT BUTTON
-===================================================== */
-
-modalEditButton.addEventListener(
-    "click",
-    () => {
-
-        if (selectedEventId === null) {
-            return;
-        }
-
-
-        startEdit(
-            selectedEventId
-        );
-
-    }
-);
-
-
-/* =====================================================
-   MODAL DELETE BUTTON
-===================================================== */
-
-modalDeleteButton.addEventListener(
-    "click",
-    () => {
-
-        if (selectedEventId === null) {
-            return;
-        }
-
-
-        /* Close details popup */
-
-        eventModal.hide();
-
-
-        /* Open delete confirmation */
-
-        openDeleteConfirmation(
-            selectedEventId
-        );
-
-    }
-);
-
-
-/* =====================================================
-   SEARCH EVENTS
-===================================================== */
-
-searchInput.addEventListener(
-    "input",
-    () => {
-
-        const filteredEvents =
-            getFilteredEvents();
-
-
-        renderEvents(
-            filteredEvents
-        );
-
-    }
-);
-
-
-/* =====================================================
-   FILTER EVENTS
-===================================================== */
 
 function getFilteredEvents() {
 
-    const searchText =
-        searchInput.value
-            .trim()
-            .toLowerCase();
+    const text =
+        searchInput.value.trim().toLowerCase();
 
-
-    /* Show all events */
-
-    if (searchText === "") {
-
-        return events;
-
-    }
-
-
-    /* Search title, type and description */
+    if (!text) return events;
 
     return events.filter(event =>
-
-        event.title
-            .toLowerCase()
-            .includes(searchText)
-
-        ||
-
-        event.type
-            .toLowerCase()
-            .includes(searchText)
-
-        ||
-
-        event.description
-            .toLowerCase()
-            .includes(searchText)
-
+        event.title.toLowerCase().includes(text) ||
+        event.type.toLowerCase().includes(text) ||
+        event.description.toLowerCase().includes(text)
     );
-
 }
 
 
-/* =====================================================
-   UPDATE EVENT COUNT
-===================================================== */
+/* =========================
+   EVENT COUNT
+========================= */
 
-function updateEventCount() {
+function updateCount() {
 
     eventCount.textContent =
         events.length;
@@ -991,91 +454,58 @@ function updateEventCount() {
 }
 
 
-/* =====================================================
-   FORMAT DATE
-===================================================== */
+/* =========================
+   DATE FORMAT
+========================= */
 
-function formatDate(dateString) {
+function formatDate(date) {
 
-    if (!dateString) {
-        return "";
-    }
-
-
-    const date =
-        new Date(
-            `${dateString}T00:00:00`
-        );
-
-
-    return date.toLocaleDateString(
-        "en-GB",
-        {
-            day: "2-digit",
-            month: "short",
-            year: "numeric"
-        }
-    );
-
+    return new Date(
+        `${date} T00:00:00`
+    ).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
+    });
 }
 
 
-/* =====================================================
-   ESCAPE HTML
-   Prevents HTML Injection
-===================================================== */
+/* =========================
+   SECURITY
+========================= */
 
 function escapeHTML(value) {
 
-    const div =
-        document.createElement("div");
+    const div = document.createElement("div");
 
-
-    div.textContent =
-        value;
-
+    div.textContent = value;
 
     return div.innerHTML;
-
 }
 
 
-/* =====================================================
+/* =========================
    SUCCESS MESSAGE
-===================================================== */
+========================= */
 
 function showMessage(message) {
 
-    const alert =
-        document.createElement("div");
-
+    const alert = document.createElement("div");
 
     alert.className =
         "alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3 shadow";
 
-
-    alert.style.zIndex =
-        "9999";
-
+    alert.style.zIndex = "9999";
 
     alert.innerHTML = `
-
-        <i class="bi bi-check-circle"></i>
-
+    < i class="bi bi-check-circle" ></i >
         ${escapeHTML(message)}
-
-    `;
-
+`;
 
     document.body.appendChild(alert);
 
-
-    /* Remove after 2.5 seconds */
-
     setTimeout(() => {
-
         alert.remove();
-
     }, 2500);
-
 }
+
